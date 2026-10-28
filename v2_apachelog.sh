@@ -11,20 +11,20 @@ show_usage() {
     echo -e "  $0 -f <plik_logu> [-s <data_od>] [-e <data_do>]"
     echo -e ""
     echo -e "${YELLOW}OPCJE:${NC}"
-    echo -e "  ${GREEN}-f <ścieżka>${NC}   Ścieżka do pliku logu Apache/Nginx (wymagane)"
+    echo -e "  ${GREEN}-f <ścieżka>${NC}    Ścieżka do pliku logu Apache/Nginx (zwykły plik lub .gz) (wymagane)"
     echo -e "  ${GREEN}-s <data>${NC}      Data początkowa (opcjonalnie)"
     echo -e "  ${GREEN}-e <data>${NC}      Data końcowa (opcjonalnie)"
-    echo -e "  ${GREEN}-h${NC}             Wyświetla tę pomoc"
+    echo -e "  ${GREEN}-h${NC}              Wyświetla tę pomoc"
     echo -e ""
     echo -e "${YELLOW}PRZYKŁADOWE FORMATY DATY:${NC}"
-    echo -e "  • 'YYYY-MM-DD'           np. -s '2005-12-04'"
-    echo -e "  • 'YYYY.MM.DD'           np. -s '2005.12.04'"
+    echo -e "  • 'YYYY-MM-DD'            np. -s '2005-12-04'"
+    echo -e "  • 'YYYY.MM.DD'            np. -s '2005.12.04'"
     echo -e "  • 'YYYY-MM-DD HH:MM:SS'  np. -s '2005-12-04 10:00:00'"
     echo -e "  • 'DD/Mon/YYYY:HH:MM:SS' np. -s '04/Dec/2005:10:00:00'"
     echo -e ""
     echo -e "${YELLOW}PRZYKŁADY WYWOŁANIA:${NC}"
     echo -e "  $0 -f Apache_2k.log"
-    echo -e "  $0 -f Apache_2k.log -s 2005-12-04"
+    echo -e "  $0 -f access.log.gz -s 2005-12-04"
     echo -e "  $0 -f Apache_2k.log -s 2005.12.04 -e 2005.12.05"
     echo -e "  $0 -f Apache_2k.log -s '2005-12-04 08:00:00' -e '2005-12-04 12:00:00'"
 }
@@ -108,7 +108,13 @@ fi
 TEMP_LOG=$(mktemp)
 trap 'rm -f "$TEMP_LOG"' EXIT
 
-awk -v from="$START_TS" -v to="$END_TS" '
+if [[ "$LOG_FILE" =~ \.gz$ ]]; then
+    READ_CMD="gzip -dc"
+else
+    READ_CMD="cat"
+fi
+
+$READ_CMD "$LOG_FILE" | awk -v from="$START_TS" -v to="$END_TS" '
 BEGIN {
     split("Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec", m, " ")
     for (i = 1; i <= 12; i++) month[m[i]] = sprintf("%02d", i)
@@ -121,7 +127,7 @@ BEGIN {
         if (to != "" && ts > to) next
         print $0
     }
-}' "$LOG_FILE" > "$TEMP_LOG"
+}' > "$TEMP_LOG"
 
 if [ ! -s "$TEMP_LOG" ]; then
     echo -e "${YELLOW}[!] Brak wpisów w wybranym przedziale czasowym.${NC}"
@@ -129,7 +135,7 @@ if [ ! -s "$TEMP_LOG" ]; then
 fi
 
 echo -e "${BLUE}================================================================${NC}"
-echo -e "${RED}       ANALIZA: $LOG_FILE "
+echo -e "${RED}        ANALIZA: $LOG_FILE "
 
 FIRST_DATE=$(head -n 1 "$TEMP_LOG" | awk '{print $4, $5}' | tr -d '[]')
 LAST_DATE=$(tail -n 1 "$TEMP_LOG" | awk '{print $4, $5}' | tr -d '[]')
